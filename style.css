@@ -1,0 +1,263 @@
+html{
+  overflow: hidden;
+}
+
+body,p,a {
+
+  font-family:sans-serif;
+
+  overflow: auto; /* or overflow: scroll; */
+	margin: 0;
+	border: 0;
+	font-size: 100%;
+	font: inherit;
+	vertical-align: baseline;
+  /* position: relative; */
+
+}
+
+
+
+canvas {
+  display: block;
+
+}
+
+.draggable{
+  font-size:medium;
+  font-weight:100;
+  cursor:grab;
+  position: absolute;
+
+}
+
+
+#word {
+  position: absolute;
+  transition: transform 0.5s;
+}
+
+#stars{
+  position: fixed;
+  padding: 10px;
+  display: inline-block;
+}
+
+.dropbox {
+  width: 350px;
+  height: 40px;
+  padding: 15px;
+  border: 1px solid #292828;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+#container{
+  position: absolute;
+ /* z-index: 2;*/
+}
+
+
+
+#image img, img {
+  width: 100%; 
+}
+
+#video{
+  display:none;
+}
+
+.div1{
+  margin: 0;
+  padding: 0;
+  display: block;
+  position: relative;
+  z-index: -1;
+}
+
+
+
+
+
+.title {
+  font-size: 24px;
+  border-bottom: 2px dashed #ffffff;
+  padding: 10px 0;
+  display: inline-block;
+}
+
+.artist {
+  font-size: 12px;
+  font-style: italic;
+  color: #cccccc;
+}
+
+.poem {
+  width: 500px;
+  left: 30px;
+}
+
+  .line {
+    text-align: justify;
+    line-height: 1.5;
+    text-indent: 2em; /* Add an indentation to prevent the first line from being justified */
+    display: flex;
+    justify-content: center;
+}
+
+
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-30px);
+  }
+  60% {
+    transform: translateY(-15px);
+  }
+}
+
+.animated {
+  animation: bounce 10s infinite;
+  animation: flash 10s infinite;
+
+
+}
+
+
+.note {
+  font-size: 10px;
+  color: #ddd7d7;
+
+}
+
+.comma {
+  font-size: 18px;
+  margin: 0 5px;
+}
+
+.list {
+  list-style-type: decimal;
+  padding-left: 20px;
+}
+
+.list-item {
+  margin: 10px 0;
+}
+
+
+.button-style {
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+  background: white;
+  color: #100e0e;
+  cursor: pointer;
+  padding: 2px;
+  position: absolute;
+  text-decoration: none;
+  border: 1px solid black; /* Optional: Add a border */
+  transition: background-color 0.3s, color 0.3s, border-color 0.3s; /* Smooth transition for hover effect */
+}
+
+.button-style:hover {
+  background-color: #3c3a3a; /* Change background color on hover */
+  color: #f0f0f0; /* Change text color on hover */
+  border-color: #100e0e; /* Change border color on hover */
+}
+
+
+#generation-counter {
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+  position: absolute;
+  top: 30px; /* Adjust this value based on the height of your button */
+  left: 50%;
+  transform: translateX(-50%);
+  color: #f0f0f0;
+  
+  padding: 10px;
+  text-align: center;
+  text-shadow: 
+    -1px -1px 0 #000,  
+     1px -1px 0 #000,
+    -1px 1px 0 #000,
+     1px 1px 0 #000; /* Black text outline */
+}
+
+
+
+#save-button {
+  top: 10px;
+  left: 10px;
+  cursor:cell;
+}
+
+#help {
+  top: 10px;
+  right: 10px;
+  cursor: help;
+  padding-left:10px;
+  padding-right:10px;
+
+}
+
+#about {
+  bottom: 10px;
+  right: 10px;
+  cursor:context-menu;
+  padding-left:10px;
+  padding-right:10px;
+
+}
+
+#hub-link {
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: medium;
+  padding-left:10px;
+  padding-right:10px;
+
+}
+
+#social-button {
+  bottom: 10px;
+  left: 10px;
+  padding-left:10px;
+  padding-right:10px;
+}
+
+#social-popup {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background-color: white;
+  opacity: 0.8; /* Set transparency (adjust as needed) */
+
+  padding: 20px;
+  border-radius: 5px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  z-index: 100; /* Ensure it's above other elements */
+}
+
+#close-popup {
+top:10%;
+left:10%;
+
+}
+
+a {
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+
+
+  color: #100e0e;
+  overflow: hidden;
+}
+
+a:hover {
+color: #a90c0c;
+}
