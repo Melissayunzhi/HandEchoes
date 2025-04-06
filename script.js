@@ -1,259 +1,259 @@
-let CELL_SIZE = 15; // Size of each cell
-let gridSize; // Number of columns and rows in the grid
-let grid; // 2D array to store the grid
-let colorGrid; // 2D array to store the colors of the cells
-let isDrawing = false; // Flag to indicate whether the mouse is being dragged
-let generationCount = 0; // Generation count
+let CELL_SIZE = 15;
+let gridSize;
+let grid;
+let colorGrid;
+let isDrawing = false;
+let generationCount = 0;
 let saveNextGenerations = false;
 let generationsToSave = [];
+
+let frozenFrame;
+let lastFingerX = null;
+let lastFingerY = null;
+
 
 let videoPaused = false;
 
 let instructionsDiv;
-let helpVisible = true; // Flag to control visibility
-let alertShown = false; // Flag to track whether the alert has been shown
+let helpVisible = true;
+let alertShown = false;
 
-let DELAY = 1000; // Delay in milliseconds before new cells start following the rules
-let followRules = false; // Flag to indicate whether to follow the rules of Game of Life
-let isPaused = true; // Flag to indicate whether the simulation is paused
-let timer; // Timer to track the delay
+let DELAY = 1000;
+let followRules = false;
+let isPaused = true;
+let timer;
 let showGrid = false;
 
-let history = []; // History of cell positions for undo
+let history = [];
 
-let zoomFactor = 1.0; // Zoom factor
-let offset; // Offset for panning
+let zoomFactor = 1.0;
+let offset;
 
 let video;
-let bodyPose;
-let poses = [];
+let handpose;
+let predictions = [];
 
 let currentRule = 0;
 
+function preload() {
+  console.log("Preparing to load handpose model...");
 
+  const script1 = document.createElement('script');
+  script1.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js';
+  script1.onload = () => console.log("MediaPipe Hands loaded");
+  document.body.appendChild(script1);
 
-
-async function preload() {
-    console.log("Loading BodyPose (MoveNet) model...");
-    bodyPose = await ml5.bodyPose("MoveNet");
-
-    if (!bodyPose) {
-        console.error("Error: BodyPose model failed to load.");
-    } else {
-        console.log("BodyPose (MoveNet) model loaded successfully!", bodyPose);
-    }
+  const script2 = document.createElement('script');
+  script2.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
+  script2.onload = () => console.log("MediaPipe Camera Utils loaded");
+  document.body.appendChild(script2);
 }
 
-
-
-
-function modelLoaded() {
-    console.log("BodyPose Model Loaded!");
-    
-    drawGenerationCountOnCanvas();
+function modelReady() {
+  console.log("Handpose model loaded successfully!");
+  handpose.onResults(results => {
+    predictions = results.multiHandLandmarks || [];
+  });
 }
 
 async function setup() {
-    createCanvas(windowWidth, windowHeight);
-    gridSize = createVector(floor(width / CELL_SIZE), floor(height / CELL_SIZE));
+  createCanvas(windowWidth, windowHeight);
+  gridSize = createVector(floor(width / CELL_SIZE), floor(height / CELL_SIZE));
 
-    grid = new Array(gridSize.x);
-    colorGrid = new Array(gridSize.x);
-    for (let i = 0; i < gridSize.x; i++) {
-        grid[i] = new Array(gridSize.y).fill(0);
-        colorGrid[i] = new Array(gridSize.y).fill([0, 0, 0]);
+  grid = new Array(gridSize.x);
+  colorGrid = new Array(gridSize.x);
+  for (let i = 0; i < gridSize.x; i++) {
+    grid[i] = new Array(gridSize.y).fill(0);
+    colorGrid[i] = new Array(gridSize.y).fill([0, 0, 0]);
+  }
+
+  initializeGrid();
+  isDrawing = true;
+  followRules = false;
+  isPaused = true;
+  timer = millis();
+  showGrid = false;
+
+  history = [];
+  offset = createVector(0, 0);
+
+  video = createCapture(VIDEO);
+  video.size(width, height);
+  video.hide();
+
+  pixelDensity(1);
+
+  const interval = setInterval(() => {
+    if (typeof Hands !== 'undefined' && typeof Camera !== 'undefined') {
+      clearInterval(interval);
+
+      const handPoseOptions = {
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      };
+
+      handpose = new Hands(handPoseOptions);
+      handpose.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.7
+      });
+
+      handpose.onResults(results => {
+        predictions = results.multiHandLandmarks || [];
+      });
+
+      const camera = new Camera(video.elt, {
+        onFrame: async () => {
+          await handpose.send({ image: video.elt });
+        },
+        width: width,
+        height: height
+      });
+      camera.start();
+
+    } else {
+      console.log("Waiting for MediaPipe Hands and Camera Utils to be defined...");
     }
+  }, 100);
 
-    initializeGrid(); // Clear the grid
-    isDrawing = true; // Allow drawing by default
-    followRules = false;
-    isPaused = true; // Simulation is paused by default
-    timer = millis();
-    showGrid = false;
+  instructionsDiv = createDiv();
+  instructionsDiv.style('font-family', "'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif");
+  instructionsDiv.style('background-color', 'rgba(255, 255, 255, 0.8)');
+  instructionsDiv.style('padding', '10px');
+  instructionsDiv.position(width - 220, 20);
+  instructionsDiv.html(
+    "<strong>How to Interact:</strong><br>" +
+    "<ul>" +
+    "<li>Draw or write with your fingertip.</li>" +
+    "<li>Press <strong>ENTER</strong> to send.</li>" +
+    "<li>Press <strong>Spacebar</strong> to stop or pause the simulation.</li>" +
+    "<li>Press <strong>R</strong> to reset.</li>" +
+    "<li>Press <strong>G</strong> to toggle grid visibility.</li>" +
+    "</ul>");
 
-    history = [];
-
-    offset = createVector(0, 0);
-
-    video = createCapture(VIDEO);
-    video.size(width, height);
-    video.hide();
-
-    pixelDensity(1);
-    let modelCheckInterval = setInterval(() => {
-        if (bodyPose) {
-            console.log("Starting pose detection...");
-            bodyPose.detectStart(video, gotPoses);
-            clearInterval(modelCheckInterval); // Stop checking once the model is loaded
-        } else {
-            console.warn("BodyPose model not loaded yet, waiting...");
-        }
-    }, 100); // Check every 500ms
-    
-    // Initialize the instructionsDiv
-    instructionsDiv = createDiv();
-    instructionsDiv.style('font-family', "'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif");
-    instructionsDiv.style('background-color', 'rgba(255, 255, 255, 0.8)');
-    instructionsDiv.style('padding', '10px');
-    instructionsDiv.position(width - 220, 20);
-    instructionsDiv.html(
-        "<strong>How to Interact:</strong><br>" +
-        "<ul>" +
-        "<li>Draw or write with your nose.</li>" +
-        "<li>Press <strong>ENTER</strong> to send.</li>" +
-        "<li>Press <strong>Spacebar</strong> to stop or pause the simulation.</li>" +
-        "<li>Press <strong>R</strong> to reset.</li>" +
-        "<li>Press <strong>G</strong> to toggle grid visibility.</li>" +
-        "</ul>"
-    );
-
-    // Show the initial alert
-    showInstructionsAlert();
-
-    // Get the social button and popup elements
-    let socialButton = document.getElementById('social-button');
-    let socialPopup = document.getElementById('social-popup');
-    let closePopupButton = document.getElementById('close-popup');
-
-    // Toggle the popup on click
-    socialButton.addEventListener('click', function() {
-        socialPopup.style.display = socialPopup.style.display === 'block' ? 'none' : 'block';
-    });
-
-    // Close the popup when the close button is clicked
-    closePopupButton.addEventListener('click', function() {
-        socialPopup.style.display = 'none';
-    });
-
-    // Select the about button and popup div
-    let aboutBtn = select('#about');
-    let aboutPopup = select('#aboutPopup');
-
-    // Apply styling to the popup
-    aboutPopup.style('font-family', "'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif");
-    aboutPopup.style('background-color', 'rgba(255, 255, 255, 0.8)');
-    aboutPopup.style('padding', '10px');
-    aboutPopup.style('text-align', 'center');
-    aboutPopup.style('border-radius', '8px');
-    aboutPopup.style('position', 'fixed');
-    aboutPopup.style('bottom', '50%');
-    aboutPopup.style('right', '50%');
-    aboutPopup.style('transform', 'translate(50%, 50%)');
-    aboutPopup.style('display', 'none');
-    aboutPopup.style('z-index', '100');
-
-    // Show popup on mouse hover
-    aboutBtn.mouseOver(() => {
-        aboutPopup.style('display', 'block');
-    });
-
-    // Hide popup when mouse leaves
-    aboutBtn.mouseOut(() => {
-        aboutPopup.style('display', 'none');
-    });
-}
-
-function gotPoses(results) {
-    poses = results;
+  showInstructionsAlert();
 }
 
 function draw() {
-        background(22, 30, 40); // Normal background once loaded
-        // Your regular drawing code here...
-        text("Loading, please wait...", width / 2, height / 2);
-        textSize(22);
-        textAlign(CENTER, CENTER);
-        fill(255); // White text
 
-    
-    detectCursorHover();
-    translate(width, 0);
-    scale(-1, 1);
+  background(22, 30, 40);
+  textSize(22);
+  textAlign(CENTER, CENTER);
+  fill(255);
+
+  translate(width, 0);
+  scale(-1, 1);
+  image(video, 0, 0, width, height);
+  if (videoPaused && frozenFrame) {
+    image(frozenFrame, 0, 0, width, height);
+  } else {
     image(video, 0, 0, width, height);
-
-    let noseX, noseY;
-
-    // Draw only the nose point if it exists and update the cellular automata grid
-    if (poses.length > 0) {
-        let pose = poses[0];
-        let nose = pose.keypoints.find(keypoint => keypoint.name === 'nose');
-        if (nose) {
-            noseX = nose.x;
-            noseY = nose.y;
-
-            if (isDrawing && !videoPaused) {
-                let i = floor(noseX / CELL_SIZE);
-                let j = floor(noseY / CELL_SIZE);
-
-                if (i >= 0 && i < gridSize.x && j >= 0 && j < gridSize.y) {
-                    grid[i][j] = 1;
-                    colorGrid[i][j] = generateColor(noseX, noseY, i * CELL_SIZE, j * CELL_SIZE); // Store color when drawing
-                    history.push(createVector(i, j)); // Add cell position to history
-                }
-            }
-        }
+    if (!videoPaused) {
+      frozenFrame = video.get(); // Store the last frame
     }
+  }
 
-    displayGrid(noseX, noseY);
-
-    // Check if the delay has passed and the simulation is not paused
-    if (followRules && !isPaused && millis() - timer > DELAY) {
-        nextGeneration(); // Calculate the next generation
-        timer = millis(); // Reset the timer
+  let fingerX = null;
+  let fingerY = null;
+  
+  if (predictions.length > 0 && predictions[0].length >= 9) {
+    const indexTip = predictions[0][8];
+    fingerX = indexTip.x * width;
+    fingerY = indexTip.y * height;
+  
+    // 🧠 store the last valid positions
+    lastFingerX = fingerX;
+    lastFingerY = fingerY;
+  
+    if (isDrawing && !videoPaused) {
+      const i = floor(fingerX / CELL_SIZE);
+      const j = floor(fingerY / CELL_SIZE);
+      if (i >= 0 && i < gridSize.x && j >= 0 && j < gridSize.y) {
+        grid[i][j] = 1;
+        colorGrid[i][j] = generateColor(fingerX, fingerY, i * CELL_SIZE, j * CELL_SIZE);
+        history.push(createVector(i, j));
+      }
     }
+  } else {
+    // 🧠 use last known position when no hand is visible
+    fingerX = lastFingerX;
+    fingerY = lastFingerY;
+  }
+  
 
-    if (saveNextGenerations && generationsToSave.includes(generationCount)) {
-        drawGenerationCountOnCanvas(); // Ensure font settings are applied
-        saveCanvas('Generation_' + generationCount, 'png');
-        // Remove generation from the array to prevent multiple saves
-        const index = generationsToSave.indexOf(generationCount);
-        if (index > -1) {
-            generationsToSave.splice(index, 1);
-        }
-    }
+  displayGrid(fingerX, fingerY);
+  if (followRules && !isPaused && millis() - timer > DELAY) {
+    nextGeneration();
+    timer = millis();
+  }
+
+  if (saveNextGenerations && generationsToSave.includes(generationCount)) {
+    drawGenerationCountOnCanvas(); // Optional overlay
+    saveCanvas('Generation_' + generationCount, 'png');
+    generationsToSave = generationsToSave.filter(g => g !== generationCount);
+  }
+
+  
 }
 
-function generateColor(noseX, noseY, x, y) {
-    let distanceToNose = dist(noseX, noseY, x, y);
-    let r = (sin(distanceToNose * 0.01) + 1) * 127.5; // Red
-    let g = (cos(distanceToNose * 0.01) + 1) * 127.5; // Green
-    let b = (sin(distanceToNose * 0.4) + 1) * 127.5; // Blue
-    return [b, 150, r];
+function generateColor(x1, y1, x2, y2) {
+  let d = dist(x1, y1, x2, y2);
+  let r = (sin(d * 0.01) + 1) * 127.5;
+  let g = (cos(d * 0.01) + 1) * 127.5;
+  let b = (sin(d * 0.4) + 1) * 127.5;
+  return [b, 150, r];
 }
 
-function displayGrid(noseX, noseY) {
-    if (showGrid) {
-        stroke(255, 100);
-        for (let i = 0; i <= width; i += CELL_SIZE) {
-            line(i, 0, i, height);
-        }
-        for (let j = 0; j <= height; j += CELL_SIZE) {
-            line(0, j, width, j);
-        }
+function displayGrid(cx, cy) {
+  if (showGrid) {
+    stroke(255, 100);
+    for (let i = 0; i <= width; i += CELL_SIZE) {
+      line(i, 0, i, height);
     }
-
-    stroke(255, 128);
-
-    // Display the cells
-    for (let i = 0; i < gridSize.x; i++) {
-        for (let j = 0; j < gridSize.y; j++) {
-            let x = i * CELL_SIZE;
-            let y = j * CELL_SIZE;
-
-            if (grid[i][j] === 1) {
-                if (videoPaused) {
-                    let color = colorGrid[i][j];
-                    fill(color[0], color[1], color[2]); // Use stored colors
-                } else {
-                    let color = generateColor(noseX, noseY, x, y);
-                    fill(color[0], color[1], color[2]); // Use dynamic colors
-                    colorGrid[i][j] = color; // Update color in the grid
-                }
-                rect(x, y, CELL_SIZE, CELL_SIZE);
-            }
-        }
+    for (let j = 0; j <= height; j += CELL_SIZE) {
+      line(0, j, width, j);
     }
+  }
+
+  stroke(255, 128);
+  for (let i = 0; i < gridSize.x; i++) {
+    for (let j = 0; j < gridSize.y; j++) {
+      let x = i * CELL_SIZE;
+      let y = j * CELL_SIZE;
+
+      if (grid[i][j] === 1) {
+        let col = videoPaused ? colorGrid[i][j] : generateColor(cx, cy, x, y);
+        fill(col[0], col[1], col[2]);
+        if (!videoPaused) colorGrid[i][j] = col;
+        rect(x, y, CELL_SIZE, CELL_SIZE);
+      }
+    }
+  }
 }
+
+function initializeGrid() {
+  for (let i = 0; i < gridSize.x; i++) {
+    for (let j = 0; j < gridSize.y; j++) {
+      grid[i][j] = 0;
+      colorGrid[i][j] = [0, 0, 0];
+    }
+  }
+}
+
+function showInstructionsAlert() {
+  if (!alertShown) {
+    alert("Please draw or write your message :) \n\n" +
+      "Draw or write with your right hand. \n" +
+      "Hit ENTER to send. \n" +
+      "Space bar to stop or pause the simulation.\n" +
+      "R to Reset.\n" +
+      "G to toggle grid visibility.\n\n" +
+      "Remember that more help is available in the top right corner! ");
+    alertShown = true;
+  }
+}
+
 
 function keyPressed() {
     if (key === 'r' || key === 'R') {
@@ -412,14 +412,6 @@ function countNeighbors(x, y) {
     return count;
 }
 
-function initializeGrid() {
-    for (let i = 0; i < gridSize.x; i++) {
-        for (let j = 0; j < gridSize.y; j++) {
-            grid[i][j] = 0; // Set all cells to 0 (clear the grid)
-            colorGrid[i][j] = [0, 0, 0]; // Initialize the color grid
-        }
-    }
-}
 
 function windowResized() {
     resizeCanvas(windowWidth, windowHeight);
@@ -465,18 +457,6 @@ function detectCursorHover() {
     }
 }
 
-function showInstructionsAlert() {
-    if (!alertShown) {
-        alert("Please draw or write your message :) \n\n" +
-            "Draw or write with your nose. \n" +
-            "Hit ENTER to send. \n" +
-            "Space bar to stop or pause the simulation.\n" +
-            "R to Reset.\n" +
-            "G to toggle grid visibility.\n\n" +
-            "Remember that more help is available in the top right corner! ");
-        alertShown = true;
-    }
-}
 
 function saveAndOpenArena() {
     saveCanvasImage(); // This calls your existing function to save the image

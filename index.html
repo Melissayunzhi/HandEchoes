@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Noisy Echos</title>
+    <title>Hand Echos</title>
     <link rel="icon" href="favicon_io/favicon.ico" />
 
     <!-- Fonts -->
@@ -16,8 +16,10 @@
     <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
 
     <!-- Ensure TensorFlow.js is loaded only if ml5 doesn't autoload it -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection"></script>
+    
     <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css">
 </head>
