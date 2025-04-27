@@ -136,36 +136,40 @@ async function setup() {
 }
 
 function draw() {
-
   background(22, 30, 40);
   textSize(22);
   textAlign(CENTER, CENTER);
   fill(255);
 
+  // 🎥 Flip only the video
+  push();
   translate(width, 0);
   scale(-1, 1);
-  image(video, 0, 0, width, height);
   if (videoPaused && frozenFrame) {
     image(frozenFrame, 0, 0, width, height);
   } else {
     image(video, 0, 0, width, height);
     if (!videoPaused) {
-      frozenFrame = video.get(); // Store the last frame
+      frozenFrame = video.get(); // Save the frozen frame
     }
   }
+  pop(); // 🧹 Back to normal coordinate system
+
+  // ✍️ Normal coordinate system for drawing
 
   let fingerX = null;
   let fingerY = null;
-  
+
   if (predictions.length > 0 && predictions[0].length >= 9) {
     const indexTip = predictions[0][8];
-    fingerX = indexTip.x * width;
+    // 📍 BUT now since the video was flipped only during display, 
+    // we need to flip the X coordinate manually
+    fingerX = width - (indexTip.x * width);
     fingerY = indexTip.y * height;
-  
-    // 🧠 store the last valid positions
+
     lastFingerX = fingerX;
     lastFingerY = fingerY;
-  
+
     if (isDrawing && !videoPaused) {
       const i = floor(fingerX / CELL_SIZE);
       const j = floor(fingerY / CELL_SIZE);
@@ -176,33 +180,44 @@ function draw() {
       }
     }
   } else {
-    // 🧠 use last known position when no hand is visible
     fingerX = lastFingerX;
     fingerY = lastFingerY;
   }
-  
 
   displayGrid(fingerX, fingerY);
+
   if (followRules && !isPaused && millis() - timer > DELAY) {
     nextGeneration();
     timer = millis();
   }
 
   if (saveNextGenerations && generationsToSave.includes(generationCount)) {
-    drawGenerationCountOnCanvas(); // Optional overlay
+    drawGenerationCountOnCanvas();
     saveCanvas('Generation_' + generationCount, 'png');
     generationsToSave = generationsToSave.filter(g => g !== generationCount);
   }
 
-  
+  detectCursorHover();  
 }
+
+
 
 function generateColor(x1, y1, x2, y2) {
   let d = dist(x1, y1, x2, y2);
   let r = (sin(d * 0.01) + 1) * 127.5;
-  let g = (cos(d * 0.01) + 1) * 127.5;
+  let g = (cos(d * 0.05) + 1) * 90 +10;
   let b = (sin(d * 0.4) + 1) * 127.5;
-  return [b, 150, r];
+  return [b, g, 120];
+}
+function drawOrganicBlob(x, y, radius) {
+  beginShape();
+  for (let a = 0; a < TWO_PI; a += radians(10)) { // fewer points = softer blob
+    let r = radius + noise(x + cos(a)*10, y + sin(a)*10, frameCount*0.01) * 5;
+    let vx = x + cos(a) * r;
+    let vy = y + sin(a) * r;
+    vertex(vx, vy);
+  }
+  endShape(CLOSE);
 }
 
 function displayGrid(cx, cy) {
@@ -226,7 +241,7 @@ function displayGrid(cx, cy) {
         let col = videoPaused ? colorGrid[i][j] : generateColor(cx, cy, x, y);
         fill(col[0], col[1], col[2]);
         if (!videoPaused) colorGrid[i][j] = col;
-        rect(x, y, CELL_SIZE, CELL_SIZE);
+        drawOrganicBlob(x + CELL_SIZE / 2, y + CELL_SIZE / 2, CELL_SIZE * 0.45);
       }
     }
   }
@@ -240,6 +255,50 @@ function initializeGrid() {
     }
   }
 }
+
+
+    // Get the social button and popup elements
+    let socialButton = document.getElementById('social-button');
+    let socialPopup = document.getElementById('social-popup');
+    let closePopupButton = document.getElementById('close-popup');
+
+    // Toggle the popup on click
+    socialButton.addEventListener('click', function() {
+        socialPopup.style.display = socialPopup.style.display === 'block' ? 'none' : 'block';
+    });
+
+    // Close the popup when the close button is clicked
+    closePopupButton.addEventListener('click', function() {
+        socialPopup.style.display = 'none';
+    });
+
+// Correct About button handling
+let aboutBtn = document.getElementById('about');
+let aboutPopup = document.getElementById('aboutPopup');
+
+// Apply CSS styles to the popup
+aboutPopup.style.fontFamily = "'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif";
+aboutPopup.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+aboutPopup.style.padding = '10px';
+aboutPopup.style.textAlign = 'center';
+aboutPopup.style.borderRadius = '8px';
+aboutPopup.style.position = 'fixed';
+aboutPopup.style.bottom = '50%';
+aboutPopup.style.right = '50%';
+aboutPopup.style.transform = 'translate(50%, 50%)';
+aboutPopup.style.display = 'none';
+aboutPopup.style.zIndex = '100';
+
+// Show popup on mouse hover
+aboutBtn.addEventListener('mouseover', () => {
+  aboutPopup.style.display = 'block';
+});
+
+// Hide popup on mouse leave
+aboutBtn.addEventListener('mouseout', () => {
+  aboutPopup.style.display = 'none';
+});
+
 
 function showInstructionsAlert() {
   if (!alertShown) {
